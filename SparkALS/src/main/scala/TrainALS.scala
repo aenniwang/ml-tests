@@ -1,5 +1,8 @@
+
+package david.work.benchmark
+
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SparkContext
 import org.apache.spark.mllib.recommendation.{ALS=>mllibALS, Rating}
 
 /**
@@ -26,10 +29,10 @@ class TrainALS(sc:SparkContext, ratingFile:String, movieFile:String) {
 
     val ratingVals=sc.textFile(ratingFile).map(toRatings(_))
 
-    def DataStatistic(rVs:RDD[(Int,Int,Float)]): Unit = {
-        val count = rVs.count()
-        val users = rVs.map(l=>l._1).distinct()
-        val items = rVs.map(l=>l._2).distinct()
+    def dataStatistic(): Unit = {
+        val count = ratingVals.count()
+        val users = ratingVals.map(l=>l._1).distinct()
+        val items = ratingVals.map(l=>l._2).distinct()
 
         println("Dataset statistic:")
         println(s"\tTotal Sample count: $count")
@@ -39,6 +42,12 @@ class TrainALS(sc:SparkContext, ratingFile:String, movieFile:String) {
 
     def train(rVs:RDD[(Int,Int,Float)]): Unit = {
         println("In Class TrainALS")
+    }
+
+    def training():Unit = {
+        print("Start training ... ")
+        train(ratingVals)
+        println("Finished")
     }
 
     private def toRatings(l:String):(Int, Int, Float)={
@@ -69,6 +78,6 @@ class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) exten
 
 }
 
-class DAALSparkALSTrain extends TrainALS{
+class DAALSparkALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) extends TrainALS(sc,ratingFile,movieFile){
 
 }

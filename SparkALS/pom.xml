@@ -78,7 +78,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>david.work.processBaiduCPIData</mainClass>
+                            <mainClass>david.work.benchmark.BenchALS</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
