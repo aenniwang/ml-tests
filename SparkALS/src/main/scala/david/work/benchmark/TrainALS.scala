@@ -82,7 +82,41 @@ class ImplicitAlsTrain(sc:SparkContext,ratingFile:String, movieFile:String) exte
 }
 
 class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) extends TrainALS(sc,ratingFile,movieFile){
+    var blockCount = 10
 
+    def setBlockCount(nBlock:Int) = {
+        blockCount = nBlock
+    }
+
+    def getBlockCount = blockCount
+
+    def splitBlocks(): Unit ={
+
+        // sort data, primary order is row, secondary order is column
+      /** list sort
+        * var l = List((1,2,0.1),(1,3,0.2),(23,2,0.5))
+        * l.sortBy(x=>(x._1,x._2))
+        *
+        * And RDD works
+        * scala> scz.sortBy(x=>(x._1,x._2)).collect
+        * res4: Array[(Int, Double, Int)] = Array((1,0.1,1), (1,0.5,0), (2,0.1,2), (2,0.5,543), (3,0.4,32), (3,0.6,3), (4,0.3,63), (5,0.1,43), (9,0.2,0), (10,0.1,4), (100,0.1,6))
+        */
+      val rows = ratingVals.map(l=>l._1)
+        val columns = ratingVals.map(l=>l._2)
+
+        val rowMax=rows.max()
+        val rowPerBlock=rowMax / blockCount
+
+        for(i<-0 until blockCount){
+            val tRowMin = i*rowPerBlock
+            var tRowMax = tRowMin + rowPerBlock
+
+            if (i eq (blockCount-1))
+                tRowMax = rowMax
+
+
+        }
+    }
 }
 
 class DAALSparkALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) extends TrainALS(sc,ratingFile,movieFile){
