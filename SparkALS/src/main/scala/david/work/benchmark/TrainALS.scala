@@ -1,6 +1,7 @@
 
 package david.work.benchmark
 
+import java.io.Serializable
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.mllib.recommendation.{ALS=>mllibALS, Rating}
@@ -14,7 +15,7 @@ import org.apache.spark.mllib.recommendation.{ALS=>mllibALS, Rating}
   *     @param ratingFile: Rating file in Movie Len format: "UserID::ItemID::rating::timestamp"
   *     @param movieFile: Movie id and name pair
   */
-class TrainALS(sc:SparkContext, ratingFile:String, movieFile:String) {
+class TrainALS(sc:SparkContext, ratingFile:String, movieFile:String) extends Serializable{
     /** read rating data from hdfs
       * output with RDD?
       * - for Spark, following processing will handle with RDDs
@@ -26,8 +27,14 @@ class TrainALS(sc:SparkContext, ratingFile:String, movieFile:String) {
       * FileSystem fs = FileSystem.get(new Configuration());
       * BufferedReader br=new BufferedReader(new InputStreamReader(fs.open(pt)));
       */
-
-    val ratingVals=sc.textFile(ratingFile).map(toRatings(_))
+    /**
+      *Error:Caused by: java.io.NotSerializableException: org.apache.spark.SparkContext
+      * "val ratingVals=sc.textFile(ratingFile).map(toRatings(_))", why????
+      */
+    val ratingVals = sc.textFile(ratingFile).map(l=>{
+        val vals=l.split("::")
+        (vals(0).toInt,vals(1).toInt,vals(2).toFloat)
+    })
 
     def dataStatistic(): Unit = {
         val count = ratingVals.count()

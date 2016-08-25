@@ -1,5 +1,6 @@
+package david.work.benchmark
+
 import org.apache.spark.{SparkConf, SparkContext}
-import david.work.benchmark
 import david.work.benchmark.{ExplicitALSTrain, TrainALS}
 
 /**
@@ -30,7 +31,7 @@ object BenchALS {
     }
 
     def BenchSparkExplicitALS(ratingDat:String, movieDat:String):Unit = {
-        val sparkCf = new SparkConf().setMaster("ALS BenchMark")
+        val sparkCf = new SparkConf().setAppName("ALS BenchMark")
         val sparkSc = new SparkContext(sparkCf)
         val alsTest = new ExplicitALSTrain(sparkSc,ratingDat,movieDat)
         alsTest.dataStatistic()
