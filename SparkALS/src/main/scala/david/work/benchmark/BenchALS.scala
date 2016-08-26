@@ -27,13 +27,21 @@ object BenchALS {
         }
         println(s"BenchALS, rating file: $ratingDat, movie file $movieDat")
 
-        BenchSparkExplicitALS(ratingDat, movieDat)
+        //BenchSparkExplicitALS(ratingDat, movieDat)
+        BenchDAALMPIALS(ratingDat,movieDat)
     }
 
     def BenchSparkExplicitALS(ratingDat:String, movieDat:String):Unit = {
         val sparkCf = new SparkConf().setAppName("ALS BenchMark")
         val sparkSc = new SparkContext(sparkCf)
         val alsTest = new ExplicitALSTrain(sparkSc,ratingDat,movieDat)
+        alsTest.dataStatistic()
+        alsTest.training()
+    }
+    def BenchDAALMPIALS(ratingDat:String, movieDat:String):Unit = {
+        val sparkCf = new SparkConf().setAppName("ALS BenchMark")
+        val sparkSc = new SparkContext(sparkCf)
+        val alsTest = new DAALMPIALSTrain(sparkSc,ratingDat,movieDat)
         alsTest.dataStatistic()
         alsTest.training()
     }

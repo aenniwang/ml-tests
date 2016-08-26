@@ -1,10 +1,12 @@
 
 package david.work.benchmark
 
-import java.io.Serializable
+import java.io.{PrintWriter, Serializable}
+import java.nio.file.{Files, Paths}
+
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
-import org.apache.spark.mllib.recommendation.{ALS=>mllibALS, Rating}
+import org.apache.spark.mllib.recommendation.{Rating, ALS => mllibALS}
 
 /**
   * Created by david on 9/17/14.
@@ -31,10 +33,26 @@ class TrainALS(sc:SparkContext, ratingFile:String, movieFile:String) extends Ser
       *Error:Caused by: java.io.NotSerializableException: org.apache.spark.SparkContext
       * "val ratingVals=sc.textFile(ratingFile).map(toRatings(_))", why????
       */
+
+    /**
+      * sort data, primary order is row, secondary order is column
+      *
+      * list sort
+      * var l = List((1,2,0.1),(1,3,0.2),(23,2,0.5))
+      * l.sortBy(x=>(x._1,x._2))
+      *
+      * And RDD works
+      * scala> scz.sortBy(x=>(x._1,x._2)).collect
+      * res4: Array[(Int, Double, Int)] = Array((1,0.1,1), (1,0.5,0), (2,0.1,2), (2,0.5,543), (3,0.4,32), (3,0.6,3), (4,0.3,63), (5,0.1,43), (9,0.2,0), (10,0.1,4), (100,0.1,6))
+      */
+    /**
+      * !!!! userID is a continuous array, no discrete value.
+      * if the userID is not continuous, then map it with hash table
+      */
     val ratingVals = sc.textFile(ratingFile).map(l=>{
         val vals=l.split("::")
         (vals(0).toInt,vals(1).toInt,vals(2).toFloat)
-    })
+    }).sortBy(x=>(x._1,x._2))
 
     def dataStatistic(): Unit = {
         val count = ratingVals.count()
@@ -61,6 +79,7 @@ class TrainALS(sc:SparkContext, ratingFile:String, movieFile:String) extends Ser
         val values=l.split("::")
         (values(0).toInt,values(1).toInt, values(2).toFloat)
     }
+
 }
 
 class ExplicitALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) extends TrainALS(sc,ratingFile,movieFile){
@@ -83,6 +102,8 @@ class ImplicitAlsTrain(sc:SparkContext,ratingFile:String, movieFile:String) exte
 
 class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) extends TrainALS(sc,ratingFile,movieFile){
     var blockCount = 10
+    var blockFileName = "nf_"
+    var blockTransFileName = "nf_t_"
 
     def setBlockCount(nBlock:Int) = {
         blockCount = nBlock
@@ -90,31 +111,75 @@ class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) exten
 
     def getBlockCount = blockCount
 
-    def splitBlocks(): Unit ={
+    def splitBlocks(rating:RDD[(Int,Int,Float)],blockName:String): Unit ={
+        val maxValue = rating.reduce((x,y)=> {
+            if (x._1 > y._1)
+                x
+            else
+                y
+        })._1
 
-        // sort data, primary order is row, secondary order is column
-      /** list sort
-        * var l = List((1,2,0.1),(1,3,0.2),(23,2,0.5))
-        * l.sortBy(x=>(x._1,x._2))
-        *
-        * And RDD works
-        * scala> scz.sortBy(x=>(x._1,x._2)).collect
-        * res4: Array[(Int, Double, Int)] = Array((1,0.1,1), (1,0.5,0), (2,0.1,2), (2,0.5,543), (3,0.4,32), (3,0.6,3), (4,0.3,63), (5,0.1,43), (9,0.2,0), (10,0.1,4), (100,0.1,6))
-        */
-      val rows = ratingVals.map(l=>l._1)
-        val columns = ratingVals.map(l=>l._2)
-
-        val rowMax=rows.max()
-        val rowPerBlock=rowMax / blockCount
+        val rowPerBlock=maxValue / blockCount
 
         for(i<-0 until blockCount){
             val tRowMin = i*rowPerBlock
             var tRowMax = tRowMin + rowPerBlock
 
-            if (i eq (blockCount-1))
-                tRowMax = rowMax
+            if (i == (blockCount-1))
+                tRowMax = maxValue-1
+
+            val cBlock = rating.filter(x=>x._1>=tRowMin && x._1<tRowMax).map(_._1)
+
+            val offsets=getCSROffsets(cBlock,tRowMin,tRowMax)
+
+            // save to file
+            val fBlock = new PrintWriter(s"${blockName}_$i.dat")
+            fBlock.write(offsets.mkString(","))
+            fBlock.write(rating.map(_._2).collect().mkString(","))
+            fBlock.write(rating.map(_._3).collect().mkString(","))
+            fBlock.close()
+        }
+    }
 
 
+    def getCSROffsets(rowBlock:RDD[Int], startIdx:Int, endIdx:Int)={
+        /**
+          * Implementing Python function of value_counts
+          *     "value_cnt = rowIdx.value_counts()'
+          *
+          */
+        val rowIdx = rowBlock.map(x=>(x-startIdx,1)).reduceByKey((x1,x2)=>x1+x2).collect().toMap
+
+        val csrBase = 1
+        var offsets= List(csrBase)
+
+        for (row <- Range(0,endIdx-startIdx)) {
+            val nextOffset:Int =
+                if (rowIdx.keySet.contains(row))
+                    nextOffset + rowIdx(row)
+                else
+                    nextOffset
+
+            offsets=offsets:::List(nextOffset)
+        }
+
+        offsets
+    }
+
+    def validSplitBlocks():Boolean = {
+        for (i <- Range(0, blockCount)) {
+            if (!Files.exists(Paths.get(s"${blockFileName}_$i.dat")))
+                return false
+            if (!Files.exists(Paths.get(s"${blockTransFileName}_$i.dat")))
+                return false
+        }
+        true
+    }
+
+    def train():Unit={
+        if(!validSplitBlocks()){
+            splitBlocks(ratingVals,blockFileName)
+            splitBlocks(ratingVals.map(x=>(x._2,x._1,x._3)),blockTransFileName)
         }
     }
 }
