@@ -1,7 +1,6 @@
 package david.work.benchmark
 
 import org.apache.spark.{SparkConf, SparkContext}
-
 /**
   * Created by wanghuaq on 8/25/2016.
   */

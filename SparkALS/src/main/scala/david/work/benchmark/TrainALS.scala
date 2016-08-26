@@ -7,6 +7,7 @@ import java.nio.file.{Files, Paths}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.mllib.recommendation.{Rating, ALS => mllibALS}
+import sys.process._
 
 /**
   * Created by david on 9/17/14.
@@ -135,8 +136,11 @@ class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) exten
             // save to file
             val fBlock = new PrintWriter(s"${blockName}_$i.dat")
             fBlock.write(offsets.mkString(","))
+            fBlock.write("\n")
             fBlock.write(rating.map(_._2).collect().mkString(","))
+            fBlock.write("\n")
             fBlock.write(rating.map(_._3).collect().mkString(","))
+            fBlock.write("\n")
             fBlock.close()
         }
     }
@@ -151,7 +155,7 @@ class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) exten
         val rowIdx = rowBlock.map(x=>(x-startIdx,1)).reduceByKey((x1,x2)=>x1+x2).collect().toMap
 
         val csrBase = 1
-        var offsets= List(csrBase)
+        var offsets= List[Int]()
 
         var nextOffset = csrBase
         for (row <- Range(0,endIdx-startIdx)) {
@@ -179,6 +183,14 @@ class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) exten
             splitBlocks(rVs,blockFileName)
             splitBlocks(rVs.map(x=>(x._2,x._1,x._3)),blockTransFileName)
         }
+
+        /**
+          * scala call bash shell scripts
+          * import sys.process._
+          * may using seq
+          */
+
+        "sh runDAALMPIALS.sh" !
     }
 }
 
