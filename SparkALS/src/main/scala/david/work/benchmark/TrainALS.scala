@@ -153,14 +153,12 @@ class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) exten
         val csrBase = 1
         var offsets= List(csrBase)
 
+        var nextOffset = csrBase
         for (row <- Range(0,endIdx-startIdx)) {
-            val nextOffset:Int =
-                if (rowIdx.keySet.contains(row))
-                    nextOffset + rowIdx(row)
-                else
-                    nextOffset
 
-            offsets=offsets:::List(nextOffset)
+            if (rowIdx.keySet.contains(row))
+                nextOffset = nextOffset + rowIdx(row)
+            offsets = offsets ::: List(nextOffset)
         }
 
         offsets
