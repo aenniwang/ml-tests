@@ -49,7 +49,7 @@ class TrainALS(sc:SparkContext, ratingFile:String, movieFile:String) extends Ser
       * !!!! userID is a continuous array, no discrete value.
       * if the userID is not continuous, then map it with hash table
       */
-    val ratingVals = sc.textFile(ratingFile).map(l=>{
+    private val ratingVals = sc.textFile(ratingFile).map(l=>{
         val vals=l.split("::")
         (vals(0).toInt,vals(1).toInt,vals(2).toFloat)
     }).sortBy(x=>(x._1,x._2))
@@ -174,10 +174,10 @@ class DAALMPIALSTrain(sc:SparkContext,ratingFile:String, movieFile:String) exten
         true
     }
 
-    def train():Unit={
+    override def train(rVs:RDD[(Int,Int,Float)]): Unit = {
         if(!validSplitBlocks()){
-            splitBlocks(ratingVals,blockFileName)
-            splitBlocks(ratingVals.map(x=>(x._2,x._1,x._3)),blockTransFileName)
+            splitBlocks(rVs,blockFileName)
+            splitBlocks(rVs.map(x=>(x._2,x._1,x._3)),blockTransFileName)
         }
     }
 }
